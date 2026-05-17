@@ -925,7 +925,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global environment variables or defaults
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'sikanda-app';
@@ -1393,54 +1393,45 @@
                 },
 
                 async saveRisk() {
-                    if (!auth.currentUser) {
-                        this.showNotification('error', 'Koneksi database tidak tersedia.');
+                    const user = auth.currentUser;
+                    if (!user) {
+                        this.showNotification('error', 'Koneksi database tidak tersedia. Anda harus terautentikasi.');
                         return;
                     }
 
                     try {
-                        if (this.isEditing) {
-                            const riskDocId = this.editingRiskId.toString();
-                            const { id, ...saveData } = this.form;
-                            
-                            // Ensure clean types
-                            saveData.mitigations = saveData.mitigations.map(mit => ({
-                                id: mit.id || Date.now() + Math.random(),
-                                description: mit.description || '',
-                                pic: mit.pic || '',
-                                resources: mit.resources || '',
-                                timeline: mit.timeline || '',
-                                status: mit.status || 'Belum Mulai',
-                                obstacles: mit.obstacles || ''
-                            }));
+                        const rawForm = JSON.parse(JSON.stringify(this.form));
+                        
+                        // Ensure clean types for mitigations
+                        const mitigationsCleaned = (rawForm.mitigations || []).map(mit => ({
+                            id: mit.id || Date.now() + Math.random(),
+                            description: mit.description || '',
+                            pic: mit.pic || '',
+                            resources: mit.resources || '',
+                            timeline: mit.timeline || '',
+                            status: mit.status || 'Belum Mulai',
+                            obstacles: mit.obstacles || ''
+                        }));
 
-                            const riskDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'risks', riskDocId);
+                        const saveData = {
+                            code: rawForm.code,
+                            category: rawForm.category,
+                            event: rawForm.event,
+                            causeType: rawForm.causeType,
+                            causeDetail: rawForm.causeDetail,
+                            mitigationResponse: rawForm.mitigationResponse,
+                            mitigations: mitigationsCleaned,
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        const risksCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'risks');
+
+                        if (this.isEditing && this.editingRiskId) {
+                            const riskDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'risks', this.editingRiskId.toString());
                             await setDoc(riskDocRef, saveData);
-                            
-                            this.showNotification('success', `Berhasil memperbarui risiko ${this.form.code}`);
+                            this.showNotification('success', `Berhasil memperbarui risiko ${saveData.code}`);
                         } else {
-                            const newId = Date.now().toString();
-                            const saveData = {
-                                code: this.form.code,
-                                category: this.form.category,
-                                event: this.form.event,
-                                causeType: this.form.causeType,
-                                causeDetail: this.form.causeDetail,
-                                mitigationResponse: this.form.mitigationResponse,
-                                mitigations: this.form.mitigations.map(mit => ({
-                                    id: mit.id || Date.now() + Math.random(),
-                                    description: mit.description || '',
-                                    pic: mit.pic || '',
-                                    resources: mit.resources || '',
-                                    timeline: mit.timeline || '',
-                                    status: mit.status || 'Belum Mulai',
-                                    obstacles: mit.obstacles || ''
-                                }))
-                            };
-
-                            const riskDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'risks', newId);
-                            await setDoc(riskDocRef, saveData);
-                            
+                            await addDoc(risksCollectionRef, saveData);
                             this.showNotification('success', `Berhasil menambahkan risiko baru ${saveData.code}`);
                         }
                         this.closeModal();
