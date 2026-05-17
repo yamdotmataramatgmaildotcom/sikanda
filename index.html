@@ -73,7 +73,7 @@
     <div id="app" v-cloak class="flex flex-col md:flex-row min-h-screen">
         
         <!-- SIDEBAR -->
-        <aside class="w-full md:w-64 bg-bpom-blue text-white flex-shrink-0 flex flex-col no-print">
+        <aside class="w-full md:w-66 bg-bpom-blue text-white flex-shrink-0 flex flex-col no-print">
             <!-- Sidebar Header -->
             <div class="p-5 border-b border-blue-900 flex items-center space-x-3">
                 <div class="bg-white p-1.5 rounded-full w-10 h-10 flex items-center justify-center shadow-lg">
@@ -82,6 +82,34 @@
                 <div>
                     <h1 class="font-bold text-sm tracking-wider">BBPOM MATARAM</h1>
                     <p class="text-xs text-bpom-gold font-semibold">Substansi Penindakan</p>
+                </div>
+            </div>
+
+            <!-- Connection Status Panel -->
+            <div class="px-4 py-3 mx-4 my-3 bg-blue-950/60 rounded-xl border border-blue-800 text-xs">
+                <div class="flex items-center space-x-2">
+                    <span class="relative flex h-2 w-2">
+                        <span :class="{
+                            'bg-emerald-400': syncStatus === 'synced',
+                            'bg-amber-400 animate-ping': syncStatus === 'connecting',
+                            'bg-rose-500': syncStatus === 'error'
+                        }" class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"></span>
+                        <span :class="{
+                            'bg-emerald-500': syncStatus === 'synced',
+                            'bg-amber-500': syncStatus === 'connecting',
+                            'bg-rose-600': syncStatus === 'error'
+                        }" class="relative inline-flex rounded-full h-2 w-2"></span>
+                    </span>
+                    <span class="font-semibold text-gray-200">
+                        <span v-if="syncStatus === 'synced'">Sinkron Cloud Aktif</span>
+                        <span v-else-if="syncStatus === 'connecting'">Menghubungkan Database...</span>
+                        <span v-else>Masalah Sinkronisasi</span>
+                    </span>
+                </div>
+                <!-- Complete User ID Display for Discoverability -->
+                <div class="mt-2 pt-2 border-t border-blue-900/50 text-[10px] text-gray-400 break-all">
+                    <p class="font-bold text-bpom-gold">ID Pengguna (Firebase):</p>
+                    <p class="font-mono mt-0.5 select-all">{{ userId || 'Mengautentikasi...' }}</p>
                 </div>
             </div>
 
@@ -105,7 +133,8 @@
                 </button>
 
                 <button @click="openAddModal()" 
-                    class="w-full mt-4 bg-bpom-gold hover:bg-amber-200 text-bpom-blue font-bold flex items-center justify-center space-x-2 px-4 py-3 rounded-xl shadow-lg transition duration-200 transform active:scale-95">
+                    :disabled="syncStatus !== 'synced'"
+                    class="w-full mt-4 bg-bpom-gold hover:bg-amber-200 disabled:bg-gray-700 disabled:text-gray-400 text-bpom-blue font-bold flex items-center justify-center space-x-2 px-4 py-3 rounded-xl shadow-lg transition duration-200 transform active:scale-95">
                     <i class="fa-solid fa-plus-circle"></i>
                     <span>Input Risiko Baru</span>
                 </button>
@@ -114,12 +143,13 @@
             <!-- Sidebar Footer -->
             <div class="p-4 border-t border-blue-900 text-xs text-center text-gray-400 space-y-3">
                 <button @click="confirmClearAllRisks()" 
-                    class="w-full bg-red-950/40 hover:bg-red-900 text-red-200 hover:text-white text-[11px] font-semibold flex items-center justify-center space-x-2 py-2 rounded-lg transition duration-200">
+                    :disabled="syncStatus !== 'synced'"
+                    class="w-full bg-red-950/40 hover:bg-red-900 disabled:opacity-50 disabled:hover:bg-red-950/40 text-red-200 hover:text-white text-[11px] font-semibold flex items-center justify-center space-x-2 py-2 rounded-lg transition duration-200">
                     <i class="fa-solid fa-trash-can"></i>
                     <span>Kosongkan Semua Data</span>
                 </button>
                 <div>
-                    <p class="font-semibold text-bpom-gold">SIM-RISK Monev v2.0</p>
+                    <p class="font-semibold text-bpom-gold">SIM-RISK Cloud v3.0</p>
                     <p>&copy; 2026 BBPOM di Mataram</p>
                 </div>
             </div>
@@ -161,6 +191,16 @@
                     <button @click="notification.show = false" class="text-gray-400 hover:text-gray-600">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
+                </div>
+
+                <!-- ERROR CONNECTIVITY WARNING -->
+                <div v-if="syncStatus === 'error'" class="mb-6 bg-rose-50 border-l-4 border-rose-600 text-rose-900 p-4 rounded-xl flex items-start space-x-3 shadow-sm">
+                    <i class="fa-solid fa-database text-xl text-rose-600 mt-0.5"></i>
+                    <div>
+                        <h4 class="font-bold text-sm">Gagal Sinkronisasi dengan Database</h4>
+                        <p class="text-xs text-rose-700 mt-1">Sistem gagal tersambung ke Firestore Cloud. Silakan periksa jaringan internet Anda atau konfirmasi konfigurasi kredensial Firebase Anda.</p>
+                        <p class="text-[11px] font-mono text-rose-800 mt-1.5 bg-rose-100 p-1.5 rounded" v-if="dbError">Sistem Error: {{ dbError }}</p>
+                    </div>
                 </div>
 
                 <!-- ================= TAB: DASHBOARD ================= -->
@@ -424,7 +464,7 @@
                                 <div class="flex items-center space-x-4 self-stretch lg:self-auto justify-between border-t lg:border-t-0 pt-3 lg:pt-0 border-gray-100">
                                     <div class="text-right">
                                         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
-                                            <i class="fa-solid fa-list-check mr-1.5"></i> {{ risk.mitigations.length }} Tindakan
+                                            <i class="fa-solid fa-list-check mr-1.5"></i> {{ risk.mitigations ? risk.mitigations.length : 0 }} Tindakan
                                         </span>
                                     </div>
                                     <!-- Action Buttons -->
@@ -449,7 +489,7 @@
                                         <i class="fa-solid fa-gears text-bpom-blue"></i>
                                         <span>Rencana Tindakan & Monitoring Evaluasi</span>
                                     </h4>
-                                    <span class="text-xs font-medium text-gray-400">Silakan klik tombol <i class="fa-solid fa-square-poll-horizontal text-indigo-600"></i> pada baris tindakan untuk meng-update progress realisasi & kendala.</span>
+                                    <span class="text-xs font-medium text-gray-400 hidden md:inline">Silakan klik tombol <i class="fa-solid fa-square-poll-horizontal text-indigo-600"></i> pada baris tindakan untuk meng-update progress realisasi & kendala.</span>
                                 </div>
 
                                 <!-- Mitigations Grid / Table style -->
@@ -500,7 +540,7 @@
                                                     </button>
                                                 </td>
                                             </tr>
-                                            <tr v-if="risk.mitigations.length === 0">
+                                            <tr v-if="!risk.mitigations || risk.mitigations.length === 0">
                                                 <td colspan="8" class="py-6 text-center text-gray-400">Belum ada tindakan mitigasi terperinci. Silakan klik edit untuk menambah tindakan.</td>
                                             </tr>
                                         </tbody>
@@ -516,8 +556,8 @@
                                 <i class="fa-solid fa-box-open"></i>
                             </div>
                             <h3 class="text-lg font-bold text-gray-800">Tidak ada data ditemukan</h3>
-                            <p class="text-sm text-gray-500 mt-1">Silakan tambahkan data risiko baru untuk mulai memantau.</p>
-                            <button @click="openAddModal()" class="mt-4 bg-bpom-blue text-white font-semibold px-4 py-2 rounded-xl text-sm shadow hover:bg-blue-900 transition">
+                            <p class="text-sm text-gray-500 mt-1 font-semibold">Tersambung ke Database cloud. Anda bisa menginput data baru secara sinkron.</p>
+                            <button @click="openAddModal()" :disabled="syncStatus !== 'synced'" class="mt-4 bg-bpom-blue hover:bg-blue-900 disabled:bg-gray-400 text-white font-semibold px-4 py-2 rounded-xl text-sm shadow transition">
                                 Tambah Risiko Baru
                             </button>
                         </div>
@@ -881,8 +921,28 @@
 
     </div>
 
-    <!-- VUE JS 3 SCRIPTS -->
-    <script>
+    <!-- FIREBASE AND VUE RUNTIME SCRIPTS -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global environment variables or defaults
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'sikanda-app';
+        const firebaseConfig = {
+            apiKey: "AIzaSyA03ogKM-gm-Mt32x42qMN5HGafE7SZwgQ",
+            authDomain: "sikanda-app.firebaseapp.com",
+            projectId: "sikanda-app",
+            storageBucket: "sikanda-app.firebasestorage.app",
+            messagingSenderId: "796534365511",
+            appId: "1:796534365511:web:ea664afc7ee5ddcf7f0062"
+        };
+
+        // Initialize Firebase services
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
         const { createApp } = Vue;
 
         createApp({
@@ -903,16 +963,18 @@
                         monevStatus: '' 
                     },
 
-                    // Custom confirm state variables (Replacing native confirm dialogs)
+                    // Firebase Status & Identification
+                    syncStatus: 'connecting', // 'connecting' | 'synced' | 'error'
+                    userId: '',
+                    dbError: null,
+
                     isConfirmModalOpen: false,
                     confirmModalTitle: '',
                     confirmModalMessage: '',
                     confirmAction: null,
 
-                    // M&E Control
                     clearObstaclesOnComplete: false,
 
-                    // Current Selected Elements for Quick M&E Updates
                     selectedRisk: null,
                     selectedMitigation: {
                         id: null,
@@ -924,10 +986,8 @@
                         obstacles: ''
                     },
 
-                    // Clean Slate: No preloaded dummy risks
-                    risks: [],
+                    risks: [], // Handled completely by Firebase Real-time Listener
 
-                    // Form State
                     form: {
                         code: '',
                         category: '',
@@ -948,7 +1008,6 @@
                         ]
                     },
 
-                    // Charts Instances
                     categoryChartInstance: null,
                     progressChartInstance: null,
 
@@ -969,9 +1028,9 @@
                         filtered = filtered.filter(risk => {
                             const matchCode = risk.code.toLowerCase().includes(searchLower);
                             const matchEvent = risk.event.toLowerCase().includes(searchLower);
-                            const matchResponse = risk.mitigationResponse.toLowerCase().includes(searchLower);
-                            const matchPIC = risk.mitigations.some(mit => mit.pic.toLowerCase().includes(searchLower));
-                            const matchObstacle = risk.mitigations.some(mit => mit.obstacles && mit.obstacles.toLowerCase().includes(searchLower));
+                            const matchResponse = risk.mitigationResponse ? risk.mitigationResponse.toLowerCase().includes(searchLower) : false;
+                            const matchPIC = risk.mitigations ? risk.mitigations.some(mit => mit.pic.toLowerCase().includes(searchLower)) : false;
+                            const matchObstacle = risk.mitigations ? risk.mitigations.some(mit => mit.obstacles && mit.obstacles.toLowerCase().includes(searchLower)) : false;
                             return matchCode || matchEvent || matchResponse || matchPIC || matchObstacle;
                         });
                     }
@@ -987,11 +1046,11 @@
                     if (this.filters.monevStatus !== '') {
                         if (this.filters.monevStatus === 'Terkendala') {
                             filtered = filtered.filter(risk => {
-                                return risk.mitigations.some(mit => mit.obstacles && mit.obstacles.trim() !== '');
+                                return risk.mitigations ? risk.mitigations.some(mit => mit.obstacles && mit.obstacles.trim() !== '') : false;
                             });
                         } else {
                             filtered = filtered.filter(risk => {
-                                return risk.mitigations.some(mit => mit.status === this.filters.monevStatus);
+                                return risk.mitigations ? risk.mitigations.some(mit => mit.status === this.filters.monevStatus) : false;
                             });
                         }
                     }
@@ -1000,18 +1059,18 @@
                 },
 
                 totalMitigationsCount() {
-                    return this.risks.reduce((total, risk) => total + risk.mitigations.length, 0);
+                    return this.risks.reduce((total, risk) => total + (risk.mitigations ? risk.mitigations.length : 0), 0);
                 },
 
                 completedMitigationsCount() {
                     return this.risks.reduce((total, risk) => {
-                        return total + risk.mitigations.filter(mit => mit.status === 'Selesai').length;
+                        return total + (risk.mitigations ? risk.mitigations.filter(mit => mit.status === 'Selesai').length : 0);
                     }, 0);
                 },
 
                 ongoingMitigationsCount() {
                     return this.risks.reduce((total, risk) => {
-                        return total + risk.mitigations.filter(mit => mit.status === 'Sedang Berjalan').length;
+                        return total + (risk.mitigations ? risk.mitigations.filter(mit => mit.status === 'Sedang Berjalan').length : 0);
                     }, 0);
                 },
 
@@ -1022,19 +1081,21 @@
                 obstructedMitigationList() {
                     let list = [];
                     this.risks.forEach(risk => {
-                        risk.mitigations.forEach(mit => {
-                            if (mit.obstacles && mit.obstacles.trim() !== '') {
-                                list.push({
-                                    id: mit.id,
-                                    riskCode: risk.code,
-                                    riskId: risk.id,
-                                    description: mit.description,
-                                    pic: mit.pic,
-                                    status: mit.status,
-                                    obstacles: mit.obstacles
-                                });
-                            }
-                        });
+                        if (risk.mitigations) {
+                            risk.mitigations.forEach(mit => {
+                                if (mit.obstacles && mit.obstacles.trim() !== '') {
+                                    list.push({
+                                        id: mit.id,
+                                        riskCode: risk.code,
+                                        riskId: risk.id,
+                                        description: mit.description,
+                                        pic: mit.pic,
+                                        status: mit.status,
+                                        obstacles: mit.obstacles
+                                    });
+                                }
+                            });
+                        }
                     });
                     return list;
                 }
@@ -1042,8 +1103,7 @@
 
             watch: {
                 risks: {
-                    handler(newRisks) {
-                        localStorage.setItem('bbpom_risks_v2_clean', JSON.stringify(newRisks));
+                    handler() {
                         this.$nextTick(() => {
                             this.renderCharts();
                         });
@@ -1052,21 +1112,63 @@
                 }
             },
 
-            created() {
-                // Load from storage if available
-                const savedRisks = localStorage.getItem('bbpom_risks_v2_clean');
-                if (savedRisks) {
-                    this.risks = JSON.parse(savedRisks);
-                } else {
-                    this.risks = [];
-                }
-            },
-
-            mounted() {
+            async mounted() {
+                await this.initFirebaseSync();
                 this.renderCharts();
             },
 
             methods: {
+                async initFirebaseSync() {
+                    this.syncStatus = 'connecting';
+                    try {
+                        let user = null;
+                        
+                        // Check custom token first, then fall back to anonymous login
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            try {
+                                const userCredential = await signInWithCustomToken(auth, __initial_auth_token);
+                                user = userCredential.user;
+                            } catch (err) {
+                                console.warn("Custom token auth failed, using anonymous authentication as fallback:", err);
+                                const userCredential = await signInAnonymously(auth);
+                                user = userCredential.user;
+                            }
+                        } else {
+                            const userCredential = await signInAnonymously(auth);
+                            user = userCredential.user;
+                        }
+
+                        if (!user) {
+                            throw new Error("Gagal memperoleh identifikasi otentikasi Firebase.");
+                        }
+
+                        this.userId = user.uid;
+
+                        // Configure Real-time Listener on public collection path (RULE 1)
+                        const risksCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'risks');
+                        const q = query(risksCollectionRef);
+
+                        onSnapshot(q, (snapshot) => {
+                            const list = [];
+                            snapshot.forEach((doc) => {
+                                list.push({ id: doc.id, ...doc.data() });
+                            });
+                            this.risks = list;
+                            this.syncStatus = 'synced';
+                            this.dbError = null;
+                        }, (error) => {
+                            console.error("Firestore onSnapshot Error:", error);
+                            this.syncStatus = 'error';
+                            this.dbError = error.message;
+                        });
+
+                    } catch (err) {
+                        console.error("Firebase Sync Initialization Error:", err);
+                        this.syncStatus = 'error';
+                        this.dbError = err.message;
+                    }
+                },
+
                 toggleRiskExpand(riskId) {
                     const index = this.expandedRiskIds.indexOf(riskId);
                     if (index > -1) {
@@ -1120,10 +1222,9 @@
                 },
 
                 hasObstructedMitigation(risk) {
-                    return risk.mitigations.some(mit => mit.obstacles && mit.obstacles.trim() !== '');
+                    return risk.mitigations ? risk.mitigations.some(mit => mit.obstacles && mit.obstacles.trim() !== '') : false;
                 },
 
-                // Custom Confirm Dialog controls (Compliant with strict guardrail)
                 openConfirmModal(title, message, action) {
                     this.confirmModalTitle = title;
                     this.confirmModalMessage = message;
@@ -1147,9 +1248,19 @@
                     this.openConfirmModal(
                         "Konfirmasi Hapus Risiko",
                         `Apakah Anda yakin ingin menghapus seluruh data risiko dengan kode ${risk.code}? Tindakan ini tidak dapat dibatalkan.`,
-                        () => {
-                            this.risks = this.risks.filter(r => r.id !== risk.id);
-                            this.showNotification('success', `Sukses menghapus data risiko ${risk.code}`);
+                        async () => {
+                            if (!auth.currentUser) {
+                                this.showNotification('error', 'Gagal: Anda tidak terhubung ke database cloud.');
+                                return;
+                            }
+                            try {
+                                const riskDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'risks', risk.id.toString());
+                                await deleteDoc(riskDocRef);
+                                this.showNotification('success', `Sukses menghapus data risiko ${risk.code}`);
+                            } catch (err) {
+                                console.error("Firestore Delete Error:", err);
+                                this.showNotification('error', `Gagal menghapus: ${err.message}`);
+                            }
                         }
                     );
                 },
@@ -1158,15 +1269,26 @@
                     this.openConfirmModal(
                         "Kosongkan Seluruh Database",
                         "Apakah Anda yakin ingin menghapus seluruh data Risk Event yang tersimpan? Hal ini akan membersihkan semua data sehingga Anda dapat memulai ulang dari awal.",
-                        () => {
-                            this.risks = [];
-                            localStorage.removeItem('bbpom_risks_v2_clean');
-                            this.showNotification('success', "Database berhasil dikosongkan.");
+                        async () => {
+                            if (!auth.currentUser) {
+                                this.showNotification('error', 'Gagal: Anda tidak terhubung ke database cloud.');
+                                return;
+                            }
+                            try {
+                                this.showNotification('success', "Memulai pembersihan data cloud...");
+                                for (const r of this.risks) {
+                                    const riskDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'risks', r.id.toString());
+                                    await deleteDoc(riskDocRef);
+                                }
+                                this.showNotification('success', "Database cloud berhasil dikosongkan.");
+                            } catch (err) {
+                                console.error("Firestore Bulk Delete Error:", err);
+                                this.showNotification('error', `Gagal mengosongkan data: ${err.message}`);
+                            }
                         }
                     );
                 },
 
-                // Dynamic Action additions inside main form
                 addMitigationAction() {
                     this.form.mitigations.push({
                         id: Date.now() + Math.random(),
@@ -1233,48 +1355,99 @@
                     this.selectedRisk = null;
                 },
 
-                saveMonevUpdate() {
-                    if (!this.selectedRisk) return;
-                    
-                    const rIndex = this.risks.findIndex(r => r.id === this.selectedRisk.id);
-                    if (rIndex !== -1) {
-                        const mIndex = this.risks[rIndex].mitigations.findIndex(m => m.id === this.selectedMitigation.id);
-                        if (mIndex !== -1) {
-                            
-                            // Apply changes
-                            this.risks[rIndex].mitigations[mIndex].status = this.selectedMitigation.status;
-                            this.risks[rIndex].mitigations[mIndex].obstacles = this.selectedMitigation.obstacles;
-                            
-                            // Clear obstacles automatically if the checkbox is checked and status is Selesai
-                            if (this.selectedMitigation.status === 'Selesai' && this.clearObstaclesOnComplete) {
-                                this.risks[rIndex].mitigations[mIndex].obstacles = '';
-                            }
-
-                            this.risks = [...this.risks];
-                            this.showNotification('success', `Berhasil melakukan M&E pada mitigasi "${this.truncateText(this.selectedMitigation.description, 30)}"`);
-                        }
+                async saveMonevUpdate() {
+                    if (!auth.currentUser || !this.selectedRisk) {
+                        this.showNotification('error', 'Sesi cloud tidak aktif. Perubahan dibatalkan.');
+                        return;
                     }
-                    this.closeMonevModal();
+                    
+                    try {
+                        const rIndex = this.risks.findIndex(r => r.id === this.selectedRisk.id);
+                        if (rIndex !== -1) {
+                            const updatedRisk = JSON.parse(JSON.stringify(this.risks[rIndex]));
+                            const mIndex = updatedRisk.mitigations.findIndex(m => m.id === this.selectedMitigation.id);
+                            
+                            if (mIndex !== -1) {
+                                updatedRisk.mitigations[mIndex].status = this.selectedMitigation.status;
+                                updatedRisk.mitigations[mIndex].obstacles = this.selectedMitigation.obstacles;
+                                
+                                if (this.selectedMitigation.status === 'Selesai' && this.clearObstaclesOnComplete) {
+                                    updatedRisk.mitigations[mIndex].obstacles = '';
+                                }
+
+                                const riskDocId = updatedRisk.id.toString();
+                                // Exclude local ID before writing to clean layout
+                                const { id, ...saveData } = updatedRisk;
+
+                                const riskDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'risks', riskDocId);
+                                await setDoc(riskDocRef, saveData);
+                                
+                                this.showNotification('success', `Berhasil melakukan M&E pada mitigasi "${this.truncateText(this.selectedMitigation.description, 30)}"`);
+                            }
+                        }
+                        this.closeMonevModal();
+                    } catch (err) {
+                        console.error("Monev Firestore Update Error:", err);
+                        this.showNotification('error', `Gagal menyimpan M&E: ${err.message}`);
+                    }
                 },
 
-                saveRisk() {
-                    if (this.isEditing) {
-                        const index = this.risks.findIndex(r => r.id === this.editingRiskId);
-                        if (index !== -1) {
-                            this.risks[index] = JSON.parse(JSON.stringify(this.form));
-                            this.showNotification('success', `Berhasil memperbarui risiko ${this.form.code}`);
-                        }
-                    } else {
-                        const newRisk = JSON.parse(JSON.stringify(this.form));
-                        newRisk.id = Date.now();
-                        newRisk.mitigations.forEach(mit => {
-                            if (!mit.id) mit.id = Date.now() + Math.random();
-                            if (!mit.obstacles) mit.obstacles = '';
-                        });
-                        this.risks.push(newRisk);
-                        this.showNotification('success', `Berhasil menambahkan risiko baru ${newRisk.code}`);
+                async saveRisk() {
+                    if (!auth.currentUser) {
+                        this.showNotification('error', 'Koneksi database tidak tersedia.');
+                        return;
                     }
-                    this.closeModal();
+
+                    try {
+                        if (this.isEditing) {
+                            const riskDocId = this.editingRiskId.toString();
+                            const { id, ...saveData } = this.form;
+                            
+                            // Ensure clean types
+                            saveData.mitigations = saveData.mitigations.map(mit => ({
+                                id: mit.id || Date.now() + Math.random(),
+                                description: mit.description || '',
+                                pic: mit.pic || '',
+                                resources: mit.resources || '',
+                                timeline: mit.timeline || '',
+                                status: mit.status || 'Belum Mulai',
+                                obstacles: mit.obstacles || ''
+                            }));
+
+                            const riskDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'risks', riskDocId);
+                            await setDoc(riskDocRef, saveData);
+                            
+                            this.showNotification('success', `Berhasil memperbarui risiko ${this.form.code}`);
+                        } else {
+                            const newId = Date.now().toString();
+                            const saveData = {
+                                code: this.form.code,
+                                category: this.form.category,
+                                event: this.form.event,
+                                causeType: this.form.causeType,
+                                causeDetail: this.form.causeDetail,
+                                mitigationResponse: this.form.mitigationResponse,
+                                mitigations: this.form.mitigations.map(mit => ({
+                                    id: mit.id || Date.now() + Math.random(),
+                                    description: mit.description || '',
+                                    pic: mit.pic || '',
+                                    resources: mit.resources || '',
+                                    timeline: mit.timeline || '',
+                                    status: mit.status || 'Belum Mulai',
+                                    obstacles: mit.obstacles || ''
+                                }))
+                            };
+
+                            const riskDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'risks', newId);
+                            await setDoc(riskDocRef, saveData);
+                            
+                            this.showNotification('success', `Berhasil menambahkan risiko baru ${saveData.code}`);
+                        }
+                        this.closeModal();
+                    } catch (err) {
+                        console.error("Firestore Write Error:", err);
+                        this.showNotification('error', `Gagal menyimpan data: ${err.message}`);
+                    }
                 },
 
                 showNotification(type, message) {
@@ -1305,9 +1478,9 @@
                     }, {});
 
                     const progressData = {
-                        'Belum Mulai': this.risks.reduce((total, risk) => total + risk.mitigations.filter(mit => mit.status === 'Belum Mulai').length, 0),
-                        'Sedang Berjalan': this.risks.reduce((total, risk) => total + risk.mitigations.filter(mit => mit.status === 'Sedang Berjalan').length, 0),
-                        'Selesai': this.risks.reduce((total, risk) => total + risk.mitigations.filter(mit => mit.status === 'Selesai').length, 0)
+                        'Belum Mulai': this.risks.reduce((total, risk) => total + (risk.mitigations ? risk.mitigations.filter(mit => mit.status === 'Belum Mulai').length : 0), 0),
+                        'Sedang Berjalan': this.risks.reduce((total, risk) => total + (risk.mitigations ? risk.mitigations.filter(mit => mit.status === 'Sedang Berjalan').length : 0), 0),
+                        'Selesai': this.risks.reduce((total, risk) => total + (risk.mitigations ? risk.mitigations.filter(mit => mit.status === 'Selesai').length : 0), 0)
                     };
 
                     // CATEGORY CHART
@@ -1381,24 +1554,26 @@
                     csvContent += "Kode Risiko,Kategori Risiko,Kejadian Risiko,Penyebab Tipe,Penyebab Detail,Mitigasi Respon,No Mitigasi,Uraian Tindakan,PIC,Sumber Daya,Timeline,Realisasi Progress,Hambatan & Kendala Lapangan\n";
 
                     this.risks.forEach(risk => {
-                        risk.mitigations.forEach((mit, idx) => {
-                            const row = [
-                                `"${risk.code}"`,
-                                `"${risk.category}"`,
-                                `"${risk.event.replace(/"/g, '""')}"`,
-                                `"${risk.causeType}"`,
-                                `"${risk.causeDetail.replace(/"/g, '""')}"`,
-                                `"${risk.mitigationResponse.replace(/"/g, '""')}"`,
-                                `"${idx + 1}"`,
-                                `"${mit.description.replace(/"/g, '""')}"`,
-                                `"${mit.pic.replace(/"/g, '""')}"`,
-                                `"${mit.resources.replace(/"/g, '""')}"`,
-                                `"${mit.timeline}"`,
-                                `"${mit.status}"`,
-                                `"${(mit.obstacles || '').replace(/"/g, '""')}"`
-                            ].join(",");
-                            csvContent += row + "\n";
-                        });
+                        if (risk.mitigations) {
+                            risk.mitigations.forEach((mit, idx) => {
+                                const row = [
+                                    `"${risk.code}"`,
+                                    `"${risk.category}"`,
+                                    `"${risk.event.replace(/"/g, '""')}"`,
+                                    `"${risk.causeType}"`,
+                                    `"${risk.causeDetail.replace(/"/g, '""')}"`,
+                                    `"${(risk.mitigationResponse || '').replace(/"/g, '""')}"`,
+                                    `"${idx + 1}"`,
+                                    `"${mit.description.replace(/"/g, '""')}"`,
+                                    `"${mit.pic.replace(/"/g, '""')}"`,
+                                    `"${mit.resources.replace(/"/g, '""')}"`,
+                                    `"${mit.timeline}"`,
+                                    `"${mit.status}"`,
+                                    `"${(mit.obstacles || '').replace(/"/g, '""')}"`
+                                ].join(",");
+                                csvContent += row + "\n";
+                            });
+                        }
                     });
 
                     const encodedUri = encodeURI(csvContent);
